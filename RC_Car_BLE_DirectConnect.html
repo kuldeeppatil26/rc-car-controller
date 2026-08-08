@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>RC-01 · BLE Steering Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E10;
+    --panel:#14181B;
+    --panel-2:#1A2023;
+    --border:#262C30;
+    --text:#E4E8EA;
+    --text-dim:#6B7680;
+    --accent:#FF6A1A;
+    --accent-dim:#7A3A18;
+    --good:#35D07F;
+    --bad:#FF4545;
+    --bad-dim:#7A2A2A;
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  html,body{
+    margin:0;
+    padding:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    overscroll-behavior:none;
+  }
+
+  body{
+    display:flex;
+    justify-content:center;
+    padding:0 0 40px;
+  }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    background:
+      radial-gradient(circle at 50% -10%, #1a1f22 0%, var(--bg) 55%);
+    border-left:1px solid var(--border);
+    border-right:1px solid var(--border);
+  }
+
+  /* ---------- Header ---------- */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:18px 20px 14px;
+    border-bottom:1px solid var(--border);
+  }
+
+  .id-block{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+
+  .id-eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:.18em;
+    color:var(--text-dim);
+    text-transform:uppercase;
+  }
+
+  .id-name{
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700;
+    font-size:22px;
+    letter-spacing:.02em;
+    display:flex;
+    align-items:center;
+    gap:9px;
+  }
+
+  .status-dot{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:var(--bad);
+    box-shadow:0 0 0 3px rgba(255,69,69,.15);
+    transition:background .25s ease, box-shadow .25s ease;
+    flex-shrink:0;
+  }
+  .status-dot.connected{
+    background:var(--good);
+    box-shadow:0 0 0 3px rgba(53,208,127,.18);
+  }
+  .status-dot.connecting{
+    background:var(--accent);
+    box-shadow:0 0 0 3px rgba(255,106,26,.18);
+    animation:pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.35; }
+  }
+
+  .connect-btn{
+    font-family:'Rajdhani',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    padding:10px 18px;
+    border-radius:7px;
+    border:1px solid var(--accent);
+    background:transparent;
+    color:var(--accent);
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+  }
+  .connect-btn:active{ background:var(--accent); color:#12100e; }
+  .connect-btn.linked{
+    border-color:var(--good);
+    color:var(--good);
+  }
+  .connect-btn.linked:active{ background:var(--good); color:#0a1f14; }
+
+  .support-note{
+    font-size:11px;
+    color:var(--text-dim);
+    padding:8px 20px;
+    border-bottom:1px solid var(--border);
+    line-height:1.5;
+  }
+  .support-note strong{ color:var(--text); font-weight:500; }
+
+  /* ---------- Gauge + stick ---------- */
+  .console{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:26px 20px 10px;
+    gap:18px;
+  }
+
+  .gauge-wrap{
+    position:relative;
+    width:280px;
+    height:280px;
+  }
+
+  .gauge-svg{ position:absolute; inset:0; overflow:visible; }
+  .tick{ stroke:var(--border); stroke-width:2; }
+  .tick.major{ stroke:var(--text-dim); stroke-width:2.5; }
+  .gauge-label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    fill:var(--text-dim);
+  }
+  .needle{
+    stroke:var(--accent);
+    stroke-width:2.5;
+    stroke-linecap:round;
+    filter:drop-shadow(0 0 4px rgba(255,106,26,.55));
+    transition:stroke .15s ease;
+  }
+  .needle-hub{ fill:var(--accent); }
+
+  .stick-rig{
+    position:absolute;
+    left:50%;
+    bottom:8px;
+    transform:translateX(-50%);
+    display:flex;
+    align-items:flex-end;
+    gap:14px;
+  }
+
+  /* throttle bar */
+  .throttle-bar{
+    position:relative;
+    width:16px;
+    height:170px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    overflow:hidden;
+  }
+  .throttle-mid{
+    position:absolute;
+    left:0; right:0; top:50%;
+    height:1px;
+    background:var(--border);
+  }
+  .throttle-fill{
+    position:absolute;
+    left:0; right:0;
+    top:50%;
+    height:0px;
+    background:var(--accent);
+    transition:background .1s ease;
+  }
+  .throttle-fill.reverse{ background:var(--bad); }
+
+  /* joystick pad */
+  .pad{
+    position:relative;
+    width:170px;
+    height:170px;
+    border-radius:50%;
+    background:var(--panel);
+    border:1px solid var(--border);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.02), inset 0 20px 40px rgba(0,0,0,.35);
+    touch-action:none;
+  }
+  .pad::before{
+    content:'';
+    position:absolute;
+    inset:14px;
+    border-radius:50%;
+    border:1px dashed var(--border);
+  }
+  .pad::after{
+    content:'';
+    position:absolute;
+    left:50%; top:50%;
+    width:5px; height:5px;
+    margin:-2.5px 0 0 -2.5px;
+    border-radius:50%;
+    background:var(--border);
+  }
+  .knob{
+    position:absolute;
+    width:56px;
+    height:56px;
+    left:50%; top:50%;
+    margin:-28px 0 0 -28px;
+    border-radius:50%;
+    background:linear-gradient(160deg,#232a2e,#171b1d);
+    border:1px solid #33393d;
+    box-shadow:0 6px 14px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+    cursor:grab;
+  }
+  .knob.dragging{
+    cursor:grabbing;
+    border-color:var(--accent);
+    box-shadow:0 6px 18px rgba(0,0,0,.5), 0 0 0 4px rgba(255,106,26,.12);
+  }
+  .knob:not(.dragging){
+    transition:left .18s cubic-bezier(.2,.8,.2,1), top .18s cubic-bezier(.2,.8,.2,1);
+  }
+
+  /* ---------- Telemetry ---------- */
+  .telemetry{
+    display:flex;
+    width:100%;
+    max-width:340px;
+    border:1px solid var(--border);
+    border-radius:9px;
+    overflow:hidden;
+  }
+  .telem-cell{
+    flex:1;
+    padding:10px 0 12px;
+    text-align:center;
+    background:var(--panel);
+  }
+  .telem-cell + .telem-cell{ border-left:1px solid var(--border); }
+  .telem-label{
+    font-size:10px;
+    letter-spacing:.16em;
+    color:var(--text-dim);
+    text-transform:uppercase;
+  }
+  .telem-value{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:600;
+    font-size:20px;
+    margin-top:3px;
+    color:var(--text);
+  }
+  .telem-value.accent{ color:var(--accent); }
+
+  /* ---------- Sensitivity ---------- */
+  .control-row{
+    width:100%;
+    max-width:340px;
+    padding:4px 2px;
+  }
+  .control-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:8px;
+  }
+  .control-title{
+    font-family:'Rajdhani',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    letter-spacing:.03em;
+  }
+  .control-value{
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    color:var(--accent);
+  }
+  .control-sub{
+    font-size:11.5px;
+    color:var(--text-dim);
+    margin-top:5px;
+    line-height:1.5;
+  }
+
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    border-radius:2px;
+    background:var(--panel-2);
+    outline:none;
+    accent-color:var(--accent);
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--accent);
+    border:3px solid #0B0E10;
+    box-shadow:0 0 0 1px var(--accent);
+    cursor:pointer;
+    margin-top:-7px;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:4px; border-radius:2px; background:var(--panel-2);
+  }
+
+  /* ---------- Stop ---------- */
+  .stop-btn{
+    width:100%;
+    max-width:340px;
+    margin-top:6px;
+    padding:16px;
+    border-radius:10px;
+    border:1px solid var(--bad);
+    background:rgba(255,69,69,.06);
+    color:var(--bad);
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700;
+    font-size:17px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+  .stop-btn:active{ background:var(--bad); color:#1a0808; }
+
+  /* ---------- Collapsibles ---------- */
+  .panels{
+    width:100%;
+    max-width:340px;
+    margin:22px auto 0;
+    padding-bottom:10px;
+  }
+  details{
+    border-top:1px solid var(--border);
+  }
+  details:last-child{ border-bottom:1px solid var(--border); }
+  summary{
+    list-style:none;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:13px 2px;
+    cursor:pointer;
+    font-family:'Rajdhani',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+  }
+  summary::-webkit-details-marker{ display:none; }
+  summary .chev{ transition:transform .15s ease; color:var(--text-dim); font-size:12px; }
+  details[open] summary .chev{ transform:rotate(90deg); }
+  details[open] summary{ color:var(--text); }
+
+  .log-box{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:7px;
+    padding:10px 12px;
+    height:130px;
+    overflow-y:auto;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    line-height:1.7;
+    color:var(--text-dim);
+    margin-bottom:14px;
+  }
+  .log-box .line{ white-space:pre; }
+  .log-box .line.tx{ color:var(--accent); }
+  .log-box .line.sys{ color:var(--good); }
+  .log-box .line.err{ color:var(--bad); }
+
+  .field{ margin-bottom:12px; }
+  .field label{
+    display:block;
+    font-size:11px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin-bottom:6px;
+  }
+  .field input[type=text]{
+    width:100%;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:10px 11px;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+  }
+  .field input[type=text]:focus{
+    outline:none;
+    border-color:var(--accent);
+  }
+  .field-note{
+    font-size:11px;
+    color:var(--text-dim);
+    margin-top:-6px;
+    margin-bottom:14px;
+    line-height:1.5;
+  }
+
+  ::-webkit-scrollbar{ width:6px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:3px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .status-dot.connecting{ animation:none; }
+    .knob:not(.dragging){ transition:none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="id-block">
+      <span class="id-eyebrow">BLE Link</span>
+      <span class="id-name"><span class="status-dot" id="statusDot"></span><span id="statusText">RC-01</span></span>
+    </div>
+    <button class="connect-btn" id="connectBtn">Connect</button>
+  </div>
+
+  <div class="support-note">
+    Use <strong>Chrome for Android</strong> over <strong>HTTPS</strong>. Connect opens the native BLE chooser directly.
+  </div>
+
+  <div class="console">
+    <div class="gauge-wrap">
+      <svg class="gauge-svg" viewBox="0 0 280 280" id="gaugeSvg"></svg>
+      <div class="stick-rig">
+        <div class="throttle-bar" id="throttleBar">
+          <div class="throttle-mid"></div>
+          <div class="throttle-fill" id="throttleFill"></div>
+        </div>
+        <div class="pad" id="pad">
+          <div class="knob" id="knob"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="telemetry">
+      <div class="telem-cell">
+        <div class="telem-label">Angle</div>
+        <div class="telem-value accent" id="angleReadout">0.0°</div>
+      </div>
+      <div class="telem-cell">
+        <div class="telem-label">Throttle</div>
+        <div class="telem-value" id="throttleReadout">0%</div>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <div class="control-head">
+        <span class="control-title">Steering Trim</span>
+        <span class="control-value" id="trimValue">25%</span>
+      </div>
+      <input type="range" id="sensitivity" min="5" max="100" value="25" step="1">
+      <div class="control-sub">Scales how far the stick's left/right throw turns into real steering angle — pull this down for very small, precise curves; push it up for sharper turns.</div>
+    </div>
+
+    <button class="stop-btn" id="stopBtn">Stop</button>
+  </div>
+
+  <div class="panels">
+    <details>
+      <summary>Command Log <span class="chev">▸</span></summary>
+      <div class="log-box" id="logBox"></div>
+    </details>
+
+    <details>
+      <summary>Link Config <span class="chev">▸</span></summary>
+      <div style="padding-top:4px;">
+        <div class="field">
+          <label>Device Name Filter (optional)</label>
+          <input type="text" id="nameFilter" placeholder="e.g. RC-01 — leave blank to filter by service">
+        </div>
+        <div class="field-note">Optional. If your ESP32 advertises as RC-01, enter RC-01 here. Leave blank to show all nearby BLE devices.</div>
+
+        <label style="display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--text-dim); margin-bottom:14px; cursor:pointer;">
+          <input type="checkbox" id="filterByService" style="width:16px; height:16px; accent-color:var(--accent); margin:0;">
+          Filter by Service UUID (narrower list)
+        </label>
+        <div class="field-note">Recommended: enable this after confirming your ESP32 advertises this service UUID. If no device appears, disable it and select the ESP32 manually.</div>
+        <div class="field-note" style="margin-top:-2px;">If Android shows "Unknown or Unsupported Device", that can still be your ESP32. Select it and this page will verify the GATT service and characteristic. The ESP32 firmware must advertise the same Service UUID shown below.</div>
+
+        <div class="field">
+          <label>Service UUID</label>
+          <input type="text" id="serviceUUID" value="6e400001-b5a3-f393-e0a9-e50e24dcca9e">
+        </div>
+        <div class="field">
+          <label>Write Characteristic UUID</label>
+          <input type="text" id="writeUUID" value="6e400002-b5a3-f393-e0a9-e50e24dcca9e">
+        </div>
+        <div class="field">
+          <label>Notify Characteristic UUID (optional)</label>
+          <input type="text" id="notifyUUID" value="6e400003-b5a3-f393-e0a9-e50e24dcca9e">
+        </div>
+        <div class="field-note">These are Nordic UART Service UUIDs. They MUST exactly match the BLE Service and Characteristics in your ESP32 firmware.</div>
+        <div class="field-note" style="margin-top:8px;">
+          <strong>Discovery troubleshooting:</strong> If the ESP32 does not appear when Service filtering is ON, turn filtering OFF and select the device manually. If it appears as "Unknown or Unsupported Device", select it — that label can be normal for a custom ESP32 BLE GATT device. If connection then reports "Service not found", the ESP32 firmware UUIDs do not match these values.
+        </div>
+      </div>
+    </details>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- State ----------
+  let device=null, gattServer=null, writeChar=null, notifyChar=null;
+  let isDragging=false;
+  let currentAngle=0, currentThrottle=0;
+  let lastSendAt=0;
+  const SEND_INTERVAL_MS=60;
+  const MAX_ANGLE=90; // full-sensitivity steering range, in degrees
+
+  // ---------- Elements ----------
+  const $=id=>document.getElementById(id);
+  const statusDot=$('statusDot'), statusText=$('statusText'), connectBtn=$('connectBtn');
+  const pad=$('pad'), knob=$('knob');
+  const throttleFill=$('throttleFill'), throttleBar=$('throttleBar');
+  const angleReadout=$('angleReadout'), throttleReadout=$('throttleReadout');
+  const sensitivitySlider=$('sensitivity'), trimValue=$('trimValue');
+  const stopBtn=$('stopBtn');
+  const logBox=$('logBox');
+  const nameFilterInput=$('nameFilter'), serviceUUIDInput=$('serviceUUID'),
+        writeUUIDInput=$('writeUUID'), notifyUUIDInput=$('notifyUUID'),
+        filterByServiceInput=$('filterByService');
+
+  // ---------- Persisted config ----------
+  try{
+    const saved=JSON.parse(localStorage.getItem('rcConsoleConfig')||'{}');
+    if(saved.nameFilter!==undefined) nameFilterInput.value=saved.nameFilter;
+    if(saved.serviceUUID) serviceUUIDInput.value=saved.serviceUUID;
+    if(saved.writeUUID) writeUUIDInput.value=saved.writeUUID;
+    if(saved.notifyUUID) notifyUUIDInput.value=saved.notifyUUID;
+    if(saved.sensitivity){ sensitivitySlider.value=saved.sensitivity; }
+    if(saved.filterByService){ filterByServiceInput.checked=true; }
+  }catch(e){ /* localStorage unavailable — continue with defaults */ }
+
+  function saveConfig(){
+    try{
+      localStorage.setItem('rcConsoleConfig', JSON.stringify({
+        nameFilter:nameFilterInput.value.trim(),
+        serviceUUID:serviceUUIDInput.value.trim(),
+        writeUUID:writeUUIDInput.value.trim(),
+        notifyUUID:notifyUUIDInput.value.trim(),
+        sensitivity:sensitivitySlider.value,
+        filterByService:filterByServiceInput.checked
+      }));
+    }catch(e){}
+  }
+  [nameFilterInput,serviceUUIDInput,writeUUIDInput,notifyUUIDInput].forEach(el=>{
+    el.addEventListener('change', saveConfig);
+  });
+  filterByServiceInput.addEventListener('change', saveConfig);
+
+  // ---------- Log ----------
+  function log(msg, type){
+    const line=document.createElement('div');
+    line.className='line'+(type?(' '+type):'');
+    const t=new Date();
+    const stamp=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+':'+String(t.getSeconds()).padStart(2,'0');
+    line.textContent='['+stamp+'] '+msg;
+    logBox.appendChild(line);
+    while(logBox.children.length>60){ logBox.removeChild(logBox.firstChild); }
+    logBox.scrollTop=logBox.scrollHeight;
+  }
+
+  // ---------- Gauge (static ticks + dynamic needle) ----------
+  const svg=$('gaugeSvg');
+  const CX=140, CY=176, R_TICK_OUT=138, R_TICK_IN_MINOR=124, R_TICK_IN_MAJOR=116, R_NEEDLE=110;
+  const svgNS='http://www.w3.org/2000/svg';
+
+  function polar(cx,cy,r,angleDeg){
+    const rad=angleDeg*Math.PI/180;
+    return { x:cx + r*Math.sin(rad), y:cy - r*Math.cos(rad) };
+  }
+
+  function buildTicks(){
+    for(let a=-90; a<=90; a+=5){
+      const major = (a%30===0);
+      const p1=polar(CX,CY,R_TICK_OUT,a);
+      const p2=polar(CX,CY, major?R_TICK_IN_MAJOR:R_TICK_IN_MINOR, a);
+      const line=document.createElementNS(svgNS,'line');
+      line.setAttribute('x1',p1.x); line.setAttribute('y1',p1.y);
+      line.setAttribute('x2',p2.x); line.setAttribute('y2',p2.y);
+      line.setAttribute('class','tick'+(major?' major':''));
+      svg.appendChild(line);
+    }
+    [[-90,'-90°','end'],[0,'0°','middle'],[90,'90°','start']].forEach(([a,label,anchor])=>{
+      const p=polar(CX,CY,R_TICK_OUT+14,a);
+      const t=document.createElementNS(svgNS,'text');
+      t.setAttribute('x',p.x); t.setAttribute('y',p.y+4);
+      t.setAttribute('text-anchor',anchor);
+      t.setAttribute('class','gauge-label');
+      t.textContent=label;
+      svg.appendChild(t);
+    });
+  }
+  buildTicks();
+
+  const needle=document.createElementNS(svgNS,'line');
+  needle.setAttribute('class','needle');
+  needle.setAttribute('x1',CX); needle.setAttribute('y1',CY);
+  svg.appendChild(needle);
+  const hub=document.createElementNS(svgNS,'circle');
+  hub.setAttribute('class','needle-hub');
+  hub.setAttribute('cx',CX); hub.setAttribute('cy',CY); hub.setAttribute('r',5);
+  svg.appendChild(hub);
+
+  function updateNeedle(angleDeg){
+    const p=polar(CX,CY,R_NEEDLE,angleDeg);
+    needle.setAttribute('x2',p.x);
+    needle.setAttribute('y2',p.y);
+  }
+  updateNeedle(0);
+
+  // ---------- Sensitivity ----------
+  function refreshSensitivityLabel(){
+    trimValue.textContent=sensitivitySlider.value+'%';
+  }
+  sensitivitySlider.addEventListener('input', ()=>{
+    refreshSensitivityLabel();
+    saveConfig();
+  });
+  refreshSensitivityLabel();
+
+  // ---------- Joystick ----------
+  const PAD_RADIUS=170/2; // matches CSS .pad size
+  let padRect=null;
+
+  function getPadCenter(){
+    padRect=pad.getBoundingClientRect();
+    return { x:padRect.left+padRect.width/2, y:padRect.top+padRect.height/2, r:padRect.width/2 };
+  }
+
+  function setKnob(dx,dy){
+    knob.style.left=(PAD_RADIUS+dx)+'px';
+    knob.style.top=(PAD_RADIUS+dy)+'px';
+  }
+
+  function updateFromVector(dx,dy,radius){
+    const dist=Math.min(Math.sqrt(dx*dx+dy*dy),radius);
+    const clampScale = dist>0 ? Math.min(1,radius/Math.sqrt(dx*dx+dy*dy)) : 1;
+    const cdx = dx*clampScale, cdy = dy*clampScale;
+
+    setKnob(cdx,cdy);
+
+    const sensitivity=parseFloat(sensitivitySlider.value)/100;
+    const steerRaw=cdx/radius; // -1..1
+    currentAngle = steerRaw * MAX_ANGLE * sensitivity;
+
+    const throttleRaw = -cdy/radius; // -1..1, up = positive
+    currentThrottle = throttleRaw * 100;
+
+    updateNeedle(currentAngle);
+    updateThrottleBar(currentThrottle);
+    updateReadouts();
+    maybeSend(false);
+  }
+
+  function updateThrottleBar(val){
+    const pct=Math.abs(val)/100; // 0..1
+    const maxHalf=throttleBar.clientHeight/2;
+    const h=pct*maxHalf;
+    throttleFill.style.height=h+'px';
+    if(val>=0){
+      throttleFill.classList.remove('reverse');
+      throttleFill.style.top=(maxHalf - h)+'px';
+    }else{
+      throttleFill.classList.add('reverse');
+      throttleFill.style.top='50%';
+    }
+  }
+
+  function updateReadouts(){
+    const sign=currentAngle>0?'+':(currentAngle<0?'':'');
+    angleReadout.textContent=sign+currentAngle.toFixed(1)+'°';
+    const tSign=currentThrottle>=0?'':'-';
+    throttleReadout.textContent=tSign+Math.round(Math.abs(currentThrottle))+'%';
+  }
+
+  function resetStick(){
+    knob.classList.remove('dragging');
+    setKnob(0,0);
+    currentAngle=0; currentThrottle=0;
+    updateNeedle(0);
+    updateThrottleBar(0);
+    updateReadouts();
+    maybeSend(true);
+  }
+
+  function onPointerDown(e){
+    isDragging=true;
+    knob.classList.add('dragging');
+    getPadCenter();
+    pad.setPointerCapture(e.pointerId);
+    onPointerMove(e);
+  }
+  function onPointerMove(e){
+    if(!isDragging || !padRect) return;
+    const cx=padRect.left+padRect.width/2, cy=padRect.top+padRect.height/2;
+    const dx=e.clientX-cx, dy=e.clientY-cy;
+    updateFromVector(dx,dy,padRect.width/2);
+  }
+  function onPointerUp(e){
+    if(!isDragging) return;
+    isDragging=false;
+    try{ pad.releasePointerCapture(e.pointerId); }catch(err){}
+    resetStick();
+  }
+
+  pad.addEventListener('pointerdown', onPointerDown);
+  pad.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
+
+  stopBtn.addEventListener('click', ()=>{
+    resetStick();
+    log('STOP pressed','sys');
+  });
+
+  // ---------- BLE ----------
+  // IMPORTANT:
+  // navigator.bluetooth.requestDevice() is intentionally called DIRECTLY
+  // from the Connect button's click handler. This preserves Android Chrome's
+  // user-activation requirement for the native Bluetooth chooser.
+
+  function normalizeUUID(uuid){
+    return String(uuid || '').trim().toLowerCase();
+  }
+
+  function resetBLEState(){
+    writeChar=null;
+    notifyChar=null;
+    gattServer=null;
+  }
+
+  function showBLEError(err){
+    if(!err) return 'Unknown Bluetooth error.';
+    if(err.name==='NotFoundError'){
+      return 'No device selected / Bluetooth chooser was closed.';
+    }
+    if(err.name==='SecurityError'){
+      return 'Bluetooth permission was denied.';
+    }
+    if(err.name==='NetworkError'){
+      return 'Could not connect to the BLE device.';
+    }
+    return err.message || err.name || 'Unknown Bluetooth error.';
+  }
+
+  // This handler is deliberately NOT async.
+  // requestDevice() must be invoked synchronously from the click.
+  connectBtn.addEventListener('click', function(e){
+
+    if(device && gattServer && gattServer.connected){
+      try{ device.gatt.disconnect(); }catch(err){}
+      return;
+    }
+
+    if(!navigator.bluetooth || !navigator.bluetooth.requestDevice){
+      setStatus('','BLE unavailable');
+      log('Web Bluetooth API is not available. Use Chrome Android + HTTPS.','err');
+      alert('Web Bluetooth is not available here.\n\nUse Google Chrome on Android and open this page over HTTPS.');
+      return;
+    }
+
+    const serviceUUID=normalizeUUID(serviceUUIDInput.value);
+    const writeUUID=normalizeUUID(writeUUIDInput.value);
+    const notifyUUID=normalizeUUID(notifyUUIDInput.value);
+
+    if(!serviceUUID || !writeUUID){
+      log('Service UUID and Write UUID are required.','err');
+      alert('Please enter the Service UUID and Write Characteristic UUID.');
+      return;
+    }
+
+    saveConfig();
+
+    setStatus('connecting','Opening BLE…');
+    log('Connect clicked — requesting Bluetooth device…','sys');
+
+    // *** THIS IS THE CRITICAL LINE ***
+    // It is executed directly inside the button click event.
+    navigator.bluetooth.requestDevice({
+      acceptAllDevices:true,
+      optionalServices:[serviceUUID]
+    })
+    .then(function(selectedDevice){
+
+      device=selectedDevice;
+
+      log('Device selected: '+(device.name || '(unnamed BLE device)'),'sys');
+      log('Device ID: '+(device.id || '(not available)'),'sys');
+
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+
+      setStatus('connecting','Connecting…');
+
+      if(!device.gatt){
+        throw new Error('Selected device does not support GATT.');
+      }
+
+      return device.gatt.connect();
+    })
+    .then(function(server){
+
+      gattServer=server;
+      log('GATT connected.','sys');
+
+      return gattServer.getPrimaryService(serviceUUID);
+    })
+    .then(function(service){
+
+      log('Service found: '+serviceUUID,'sys');
+
+      return service.getCharacteristic(writeUUID)
+        .then(function(characteristic){
+
+          writeChar=characteristic;
+
+          log('Write characteristic found: '+writeUUID,'sys');
+
+          if(!notifyUUID) return;
+
+          return service.getCharacteristic(notifyUUID)
+            .then(function(nc){
+
+              notifyChar=nc;
+
+              return notifyChar.startNotifications()
+                .then(function(){
+                  notifyChar.addEventListener(
+                    'characteristicvaluechanged',
+                    onNotify
+                  );
+                  log('Notify characteristic ready.','sys');
+                });
+            })
+            .catch(function(){
+              notifyChar=null;
+              log('Notify characteristic unavailable — continuing without RX.','err');
+            });
+        });
+    })
+    .then(function(){
+
+      setStatus('connected',device.name || 'RC-01 Linked');
+      connectBtn.textContent='Disconnect';
+      connectBtn.classList.add('linked');
+
+      currentAngle=0;
+      currentThrottle=0;
+      updateNeedle(0);
+      updateThrottleBar(0);
+      updateReadouts();
+
+      log('CONNECTED — RC car ready.','sys');
+
+      return maybeSend(true);
+    })
+    .catch(function(err){
+
+      resetBLEState();
+
+      setStatus('','Disconnected');
+      connectBtn.textContent='Connect';
+      connectBtn.classList.remove('linked');
+
+      const msg=showBLEError(err);
+      log('BLE ERROR: '+msg,'err');
+
+      // Closing the chooser is normal — don't show an unnecessary popup.
+      if(err && err.name==='NotFoundError'){
+        log('Bluetooth chooser closed or no device was selected.','err');
+      }else{
+        alert('BLE connection failed:\n\n'+msg);
+      }
+    });
+  });
+
+  function onDisconnected(){
+
+    const oldName=device ? (device.name || 'BLE device') : 'BLE device';
+
+    setStatus('','Disconnected');
+    connectBtn.textContent='Connect';
+    connectBtn.classList.remove('linked');
+
+    resetBLEState();
+
+    log('Disconnected from '+oldName+'.','err');
+
+    resetStick();
+  }
+
+  function onNotify(e){
+    try{
+      const value=new TextDecoder().decode(e.target.value);
+      log('RX '+value,'sys');
+    }catch(err){
+      log('RX notification received.','sys');
+    }
+  }
+
+  const encoder=new TextEncoder();
+
+  async function maybeSend(force){
+
+    if(!writeChar) return;
+
+    const now=performance.now();
+
+    if(!force && (now-lastSendAt)<SEND_INTERVAL_MS) return;
+
+    lastSendAt=now;
+
+    const payload=
+      'A:'+currentAngle.toFixed(1)+
+      ',S:'+currentThrottle.toFixed(0)+'\n';
+
+    try{
+
+      const data=encoder.encode(payload);
+
+      if(
+        writeChar.properties &&
+        writeChar.properties.writeWithoutResponse &&
+        writeChar.writeValueWithoutResponse
+      ){
+        await writeChar.writeValueWithoutResponse(data);
+      }else if(writeChar.writeValue){
+        await writeChar.writeValue(data);
+      }else{
+        throw new Error(
+          'Write characteristic does not support writing.'
+        );
+      }
+
+      log('TX '+payload.trim(),'tx');
+
+    }catch(err){
+      log('Write failed: '+(err.message || err),'err');
+    }
+  }
+
+  // Recalculate pad geometry on resize/orientation change
+  window.addEventListener('resize', ()=>{ if(isDragging) getPadCenter(); });
+
+  log('Console ready. Connect uses acceptAllDevices + optional ESP32 service.','sys');
+})();
+</script>
+</body>
+</html>
