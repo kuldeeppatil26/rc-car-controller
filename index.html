@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RC BLE Test</title>
+<style>
+body{font-family:Arial,sans-serif;padding:24px;background:#111;color:#fff}
+button{font-size:20px;padding:16px 24px;border-radius:10px}
+#status{margin-top:20px;white-space:pre-wrap;font-family:monospace}
+</style>
+</head>
+<body>
+<h2>RC Car BLE Test</h2>
+<p>This page only tests whether Chrome can open the BLE chooser.</p>
+<button id="btn">TEST BLUETOOTH</button>
+<div id="status">Ready.</div>
+
+<script>
+const btn=document.getElementById('btn');
+const status=document.getElementById('status');
+
+function log(t){
+  status.textContent += "\n"+t;
+}
+
+btn.addEventListener('click', function(){
+  log("Button clicked.");
+
+  if(!window.isSecureContext){
+    log("ERROR: Page is NOT HTTPS/secure.");
+    return;
+  }
+
+  if(!navigator.bluetooth){
+    log("ERROR: navigator.bluetooth is unavailable.");
+    return;
+  }
+
+  log("Web Bluetooth API found.");
+  log("Opening Bluetooth chooser...");
+
+  // Must be called directly from the click handler.
+  navigator.bluetooth.requestDevice({
+    acceptAllDevices:true,
+    optionalServices:[
+      "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+    ]
+  })
+  .then(function(device){
+    log("SUCCESS!");
+    log("Device name: "+(device.name || "(unnamed)"));
+    log("Device id: "+device.id);
+  })
+  .catch(function(err){
+    log("ERROR: "+err.name);
+    log(err.message || "");
+  });
+});
+</script>
+</body>
+</html>
