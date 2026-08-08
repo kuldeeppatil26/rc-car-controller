@@ -1,0 +1,1898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>RC-01 · BLE Steering Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E10;
+    --panel:#14181B;
+    --panel-2:#1A2023;
+    --border:#262C30;
+    --text:#E4E8EA;
+    --text-dim:#6B7680;
+    --accent:#FF6A1A;
+    --accent-dim:#7A3A18;
+    --good:#35D07F;
+    --bad:#FF4545;
+    --bad-dim:#7A2A2A;
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  html,body{
+    margin:0;
+    padding:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    overscroll-behavior:none;
+  }
+
+  body{
+    display:flex;
+    justify-content:center;
+    padding:0 0 40px;
+  }
+
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    background:
+      radial-gradient(circle at 50% -10%, #1a1f22 0%, var(--bg) 55%);
+    border-left:1px solid var(--border);
+    border-right:1px solid var(--border);
+  }
+
+  /* ---------- Header ---------- */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:18px 20px 14px;
+    border-bottom:1px solid var(--border);
+  }
+
+  .id-block{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+
+  .id-eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:.18em;
+    color:var(--text-dim);
+    text-transform:uppercase;
+  }
+
+  .id-name{
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700;
+    font-size:22px;
+    letter-spacing:.02em;
+    display:flex;
+    align-items:center;
+    gap:9px;
+  }
+
+  .status-dot{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:var(--bad);
+    box-shadow:0 0 0 3px rgba(255,69,69,.15);
+    transition:background .25s ease, box-shadow .25s ease;
+    flex-shrink:0;
+  }
+  .status-dot.connected{
+    background:var(--good);
+    box-shadow:0 0 0 3px rgba(53,208,127,.18);
+  }
+  .status-dot.connecting{
+    background:var(--accent);
+    box-shadow:0 0 0 3px rgba(255,106,26,.18);
+    animation:pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.35; }
+  }
+
+  .connect-btn{
+    font-family:'Rajdhani',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    padding:10px 18px;
+    border-radius:7px;
+    border:1px solid var(--accent);
+    background:transparent;
+    color:var(--accent);
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+  }
+  .connect-btn:active{ background:var(--accent); color:#12100e; }
+  .connect-btn.linked{
+    border-color:var(--good);
+    color:var(--good);
+  }
+  .connect-btn.linked:active{ background:var(--good); color:#0a1f14; }
+
+  .support-note{
+    font-size:11px;
+    color:var(--text-dim);
+    padding:8px 20px;
+    border-bottom:1px solid var(--border);
+    line-height:1.5;
+  }
+  .support-note strong{ color:var(--text); font-weight:500; }
+
+  .context-warning{
+    display:none;
+    font-size:12.5px;
+    line-height:1.6;
+    color:#FFD7C2;
+    background:rgba(255,69,69,.1);
+    border-bottom:1px solid var(--bad);
+    padding:12px 20px;
+  }
+  .context-warning.show{ display:block; }
+  .context-warning strong{ color:var(--text); }
+  .context-warning code{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    background:rgba(0,0,0,.3);
+    padding:1px 5px;
+    border-radius:4px;
+  }
+
+  /* ---------- Gauge + stick ---------- */
+  .console{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:26px 20px 10px;
+    gap:18px;
+  }
+
+  .gauge-wrap{
+    position:relative;
+    width:280px;
+    height:280px;
+  }
+
+  .gauge-svg{ position:absolute; inset:0; overflow:visible; }
+  .tick{ stroke:var(--border); stroke-width:2; }
+  .tick.major{ stroke:var(--text-dim); stroke-width:2.5; }
+  .gauge-label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    fill:var(--text-dim);
+  }
+  .needle{
+    stroke:var(--accent);
+    stroke-width:2.5;
+    stroke-linecap:round;
+    filter:drop-shadow(0 0 4px rgba(255,106,26,.55));
+    transition:stroke .15s ease;
+  }
+  .needle-hub{ fill:var(--accent); }
+
+  .stick-rig{
+    position:absolute;
+    left:50%;
+    bottom:8px;
+    transform:translateX(-50%);
+    display:flex;
+    align-items:flex-end;
+    gap:14px;
+  }
+
+  /* throttle bar */
+  .throttle-bar{
+    position:relative;
+    width:16px;
+    height:170px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    overflow:hidden;
+  }
+  .throttle-mid{
+    position:absolute;
+    left:0; right:0; top:50%;
+    height:1px;
+    background:var(--border);
+  }
+  .throttle-fill{
+    position:absolute;
+    left:0; right:0;
+    top:50%;
+    height:0px;
+    background:var(--accent);
+    transition:background .1s ease;
+  }
+  .throttle-fill.reverse{ background:var(--bad); }
+
+  /* joystick pad */
+  .pad{
+    position:relative;
+    width:170px;
+    height:170px;
+    border-radius:50%;
+    background:var(--panel);
+    border:1px solid var(--border);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.02), inset 0 20px 40px rgba(0,0,0,.35);
+    touch-action:none;
+  }
+  .pad::before{
+    content:'';
+    position:absolute;
+    inset:14px;
+    border-radius:50%;
+    border:1px dashed var(--border);
+  }
+  .pad::after{
+    content:'';
+    position:absolute;
+    left:50%; top:50%;
+    width:5px; height:5px;
+    margin:-2.5px 0 0 -2.5px;
+    border-radius:50%;
+    background:var(--border);
+  }
+  .knob{
+    position:absolute;
+    width:56px;
+    height:56px;
+    left:50%; top:50%;
+    margin:-28px 0 0 -28px;
+    border-radius:50%;
+    background:linear-gradient(160deg,#232a2e,#171b1d);
+    border:1px solid #33393d;
+    box-shadow:0 6px 14px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+    cursor:grab;
+  }
+  .knob.dragging{
+    cursor:grabbing;
+    border-color:var(--accent);
+    box-shadow:0 6px 18px rgba(0,0,0,.5), 0 0 0 4px rgba(255,106,26,.12);
+  }
+  .knob:not(.dragging){
+    transition:left .18s cubic-bezier(.2,.8,.2,1), top .18s cubic-bezier(.2,.8,.2,1);
+  }
+
+  /* ---------- Telemetry ---------- */
+  .telemetry{
+    display:flex;
+    width:100%;
+    max-width:340px;
+    border:1px solid var(--border);
+    border-radius:9px;
+    overflow:hidden;
+  }
+  .telem-cell{
+    flex:1;
+    padding:10px 0 12px;
+    text-align:center;
+    background:var(--panel);
+  }
+  .telem-cell + .telem-cell{ border-left:1px solid var(--border); }
+  .telem-label{
+    font-size:10px;
+    letter-spacing:.16em;
+    color:var(--text-dim);
+    text-transform:uppercase;
+  }
+  .telem-value{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:600;
+    font-size:20px;
+    margin-top:3px;
+    color:var(--text);
+  }
+  .telem-value.accent{ color:var(--accent); }
+
+  /* ---------- Sensitivity ---------- */
+  .control-row{
+    width:100%;
+    max-width:340px;
+    padding:4px 2px;
+  }
+  .control-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:8px;
+  }
+  .control-title{
+    font-family:'Rajdhani',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    letter-spacing:.03em;
+  }
+  .control-value{
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    color:var(--accent);
+  }
+  .control-sub{
+    font-size:11.5px;
+    color:var(--text-dim);
+    margin-top:5px;
+    line-height:1.5;
+  }
+
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    border-radius:2px;
+    background:var(--panel-2);
+    outline:none;
+    accent-color:var(--accent);
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--accent);
+    border:3px solid #0B0E10;
+    box-shadow:0 0 0 1px var(--accent);
+    cursor:pointer;
+    margin-top:-7px;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:4px; border-radius:2px; background:var(--panel-2);
+  }
+
+  /* ---------- Stop ---------- */
+  .stop-btn{
+    width:100%;
+    max-width:340px;
+    margin-top:6px;
+    padding:16px;
+    border-radius:10px;
+    border:1px solid var(--bad);
+    background:rgba(255,69,69,.06);
+    color:var(--bad);
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700;
+    font-size:17px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+  .stop-btn:active{ background:var(--bad); color:#1a0808; }
+
+  .dir-row{
+    display:flex;
+    gap:10px;
+    width:100%;
+    max-width:340px;
+    margin-top:4px;
+  }
+  .dir-btn{
+    flex:1;
+    padding:15px 0;
+    border-radius:10px;
+    border:1px solid var(--border);
+    background:var(--panel);
+    color:var(--text);
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700;
+    font-size:14.5px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    cursor:pointer;
+    touch-action:none;
+    -webkit-user-select:none;
+    user-select:none;
+    transition:background .1s ease, border-color .1s ease, color .1s ease;
+  }
+  .dir-btn.active{
+    border-color:var(--accent);
+    background:rgba(255,106,26,.14);
+    color:var(--accent);
+  }
+  .dir-btn.latched{
+    border-color:var(--good);
+    background:rgba(53,208,127,.14);
+    color:var(--good);
+    box-shadow:0 0 0 1px rgba(53,208,127,.3);
+  }
+
+  .latch-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    width:100%;
+    max-width:340px;
+    margin-top:2px;
+  }
+  .latch-text{ display:flex; flex-direction:column; gap:2px; }
+  .latch-title{
+    font-family:'Rajdhani',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:.03em;
+  }
+  .latch-sub{ font-size:11px; color:var(--text-dim); line-height:1.4; }
+
+  .switch{ position:relative; display:inline-block; width:46px; height:26px; flex-shrink:0; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .switch-track{
+    position:absolute; inset:0;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:14px;
+    cursor:pointer;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .switch-thumb{
+    position:absolute;
+    left:3px; top:2px;
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--text-dim);
+    transition:transform .15s ease, background .15s ease;
+  }
+  .switch input:checked + .switch-track{
+    background:rgba(53,208,127,.15);
+    border-color:var(--good);
+  }
+  .switch input:checked + .switch-track .switch-thumb{
+    transform:translateX(20px);
+    background:var(--good);
+  }
+
+  .key-hint{
+    width:100%;
+    max-width:340px;
+    text-align:center;
+    font-size:10.5px;
+    color:var(--text-dim);
+    margin-top:2px;
+  }
+  .key-hint kbd{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:1px 5px;
+    margin:0 1px;
+    color:var(--text);
+  }
+
+  /* ---------- Collapsibles ---------- */
+  .panels{
+    width:100%;
+    max-width:340px;
+    margin:22px auto 0;
+    padding-bottom:10px;
+  }
+  details{
+    border-top:1px solid var(--border);
+  }
+  details:last-child{ border-bottom:1px solid var(--border); }
+  summary{
+    list-style:none;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:13px 2px;
+    cursor:pointer;
+    font-family:'Rajdhani',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+  }
+  summary::-webkit-details-marker{ display:none; }
+  summary .chev{ transition:transform .15s ease; color:var(--text-dim); font-size:12px; }
+  details[open] summary .chev{ transform:rotate(90deg); }
+  details[open] summary{ color:var(--text); }
+
+  .log-box{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:7px;
+    padding:10px 12px;
+    height:130px;
+    overflow-y:auto;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    line-height:1.7;
+    color:var(--text-dim);
+    margin-bottom:14px;
+  }
+  .log-box .line{ white-space:pre; }
+  .log-box .line.tx{ color:var(--accent); }
+  .log-box .line.sys{ color:var(--good); }
+  .log-box .line.err{ color:var(--bad); }
+
+  .field{ margin-bottom:12px; }
+  .field label{
+    display:block;
+    font-size:11px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin-bottom:6px;
+  }
+  .field input[type=text]{
+    width:100%;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:10px 11px;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+  }
+  .field input[type=text]:focus{
+    outline:none;
+    border-color:var(--accent);
+  }
+  .field-note{
+    font-size:11px;
+    color:var(--text-dim);
+    margin-top:-6px;
+    margin-bottom:14px;
+    line-height:1.5;
+  }
+
+  ::-webkit-scrollbar{ width:6px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:3px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .status-dot.connecting{ animation:none; }
+    .knob:not(.dragging){ transition:none; }
+  }
+
+  /* ---------- Autonomous Map Mode (added without changing manual console) ---------- */
+  #autoPanel{
+    display:none;
+    width:100%;
+    max-width:460px;
+    margin:0 auto;
+    padding:16px 14px 30px;
+  }
+  #autoPanel.open{display:block}
+  .auto-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .auto-title{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;letter-spacing:.04em}
+  .auto-sub{font-size:10.5px;color:var(--text-dim);line-height:1.45;margin-top:2px}
+  .auto-toolbar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+  .auto-btn{
+    padding:8px 10px;border-radius:7px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);font-family:'Rajdhani',sans-serif;
+    font-weight:600;font-size:11px;letter-spacing:.03em;cursor:pointer
+  }
+  .auto-btn.primary{border-color:var(--accent);color:var(--accent)}
+  .auto-btn.good{border-color:var(--good);color:var(--good)}
+  .auto-btn.bad{border-color:var(--bad);color:var(--bad)}
+  .auto-btn.active{background:rgba(255,106,26,.14)}
+  #autoMap{
+    width:100%;height:355px;border:1px solid var(--border);border-radius:9px;
+    overflow:hidden;background:#202428;z-index:1;
+  }
+  .map-help{font-size:10.5px;color:var(--text-dim);line-height:1.5;margin:8px 2px}
+  .map-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:8px 0}
+  .map-stat{background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:7px 4px;text-align:center}
+  .map-stat span{display:block;color:var(--text-dim);font-size:8.5px;text-transform:uppercase}
+  .map-stat b{display:block;font:600 12px 'JetBrains Mono',monospace;margin-top:3px}
+  .auto-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px}
+  .auto-card-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;margin-bottom:8px}
+  .auto-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .auto-field label{display:block;color:var(--text-dim);font-size:9px;text-transform:uppercase}
+  .auto-field input,.auto-field select{
+    width:100%;margin-top:4px;padding:7px 6px;border:1px solid var(--border);
+    border-radius:5px;background:var(--panel-2);color:var(--text);
+    font:11px 'JetBrains Mono',monospace;
+  }
+  .auto-check{display:flex;gap:7px;align-items:center;margin-top:8px;color:var(--text-dim);font-size:10.5px}
+  #waypointList{margin-top:8px}
+  .wp-item{border-top:1px solid var(--border);padding:9px 0}
+  .wp-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .wp-name{font:600 11px 'JetBrains Mono',monospace;color:var(--accent)}
+  .wp-delete{border:0;background:transparent;color:var(--bad);font-size:18px;cursor:pointer}
+  .wp-coord{font:9.5px 'JetBrains Mono',monospace;color:var(--text-dim);margin:2px 0 7px}
+  .wp-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+  .wp-fields label{font-size:8.5px;color:var(--text-dim);text-transform:uppercase}
+  .wp-fields input{width:100%;margin-top:3px;padding:6px 4px;border:1px solid var(--border);
+    border-radius:4px;background:var(--panel-2);color:var(--text);font:10px 'JetBrains Mono',monospace}
+  #missionStatus{
+    margin-top:8px;padding:8px;border:1px solid var(--border);border-radius:6px;
+    background:#080a0b;color:var(--text-dim);font:10px/1.5 'JetBrains Mono',monospace;white-space:pre-wrap
+  }
+  .leaflet-control-layers,.leaflet-bar a{background:var(--panel)!important;color:var(--text)!important}
+  .leaflet-control-layers{border:1px solid var(--border)!important}
+
+</style>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="id-block">
+      <span class="id-eyebrow">BLE Link</span>
+      <span class="id-name"><span class="status-dot" id="statusDot"></span><span id="statusText">RC-01</span></span>
+    </div>
+    <div style="display:flex;gap:7px;align-items:center;"><button class="connect-btn" id="mapModeBtn" type="button">Map / Auto</button><button class="connect-btn" id="connectBtn">Connect</button></div>
+  </div>
+
+  <div class="context-warning" id="contextWarning"></div>
+
+  <div class="support-note">
+    Runs in <strong>Chrome for Android</strong> only, served over <strong>HTTPS</strong> (Web Bluetooth isn't available in Safari/iOS or plain HTTP pages).
+  </div>
+
+
+  <!-- ---------- Autonomous Map Mode ---------- -->
+  <div id="autoPanel">
+    <div class="auto-head">
+      <div>
+        <div class="auto-title">AUTONOMOUS GPS MISSION</div>
+        <div class="auto-sub">Plan multiple points on the map. Use satellite view, current location, per-point speed/stop/radius and advanced safety settings.</div>
+      </div>
+      <button class="connect-btn" id="closeAutoBtn" type="button">Manual</button>
+    </div>
+
+    <div class="auto-toolbar">
+      <button class="auto-btn primary" id="currentLocationBtn" type="button">◎ Current Location</button>
+      <button class="auto-btn primary" id="addWaypointBtn" type="button">＋ Add Points</button>
+      <button class="auto-btn" id="followLocationBtn" type="button">Follow: OFF</button>
+      <button class="auto-btn" id="setHomeBtn" type="button">⌂ Set Home</button>
+      <button class="auto-btn" id="undoWaypointBtn" type="button">Undo</button>
+      <button class="auto-btn bad" id="clearMissionBtn" type="button">Clear</button>
+    </div>
+
+    <div id="autoMap"></div>
+    <div class="map-help">
+      <b>Multiple points:</b> tap <b>Add Points</b>, then tap the map repeatedly in the order you want the car to travel.
+      Waypoints can also be dragged after they are created. Use the layer button on the map to switch between
+      <b>Street</b> and <b>Satellite</b>.
+    </div>
+
+    <div class="map-stats">
+      <div class="map-stat"><span>Points</span><b id="autoWpCount">0</b></div>
+      <div class="map-stat"><span>Distance</span><b id="autoDistance">0 m</b></div>
+      <div class="map-stat"><span>ETA</span><b id="autoEta">0 s</b></div>
+      <div class="map-stat"><span>GPS</span><b id="autoGpsStatus">--</b></div>
+    </div>
+
+    <div class="auto-card">
+      <div class="auto-card-title">Mission Defaults</div>
+      <div class="auto-grid">
+        <div class="auto-field"><label>Default Speed %</label><input id="autoDefaultSpeed" type="number" min="5" max="100" value="30"></div>
+        <div class="auto-field"><label>Arrival Radius m</label><input id="autoDefaultRadius" type="number" min="1" max="30" value="4"></div>
+        <div class="auto-field"><label>Slow Down m</label><input id="autoSlowDistance" type="number" min="1" max="50" value="10"></div>
+        <div class="auto-field"><label>GPS Update ms</label><input id="autoGpsInterval" type="number" min="100" max="5000" value="500"></div>
+        <div class="auto-field"><label>Max Speed %</label><input id="autoMaxSpeed" type="number" min="5" max="100" value="60"></div>
+        <div class="auto-field"><label>Look Ahead m</label><input id="autoLookAhead" type="number" min="0" max="30" value="5"></div>
+      </div>
+      <label class="auto-check"><input id="autoGeofence" type="checkbox" checked> Safety geofence / route deviation stop</label>
+      <label class="auto-check"><input id="autoObstacle" type="checkbox" checked> Obstacle-stop input</label>
+      <label class="auto-check"><input id="autoReturnHome" type="checkbox"> Return Home after final point</label>
+    </div>
+
+    <div class="auto-card">
+      <div class="auto-card-title">Waypoints — speed / stop / arrival radius</div>
+      <div id="waypointList">
+        <div style="font-size:10.5px;color:var(--text-dim)">No points yet. Tap “Add Points”, then tap the map.</div>
+      </div>
+    </div>
+
+    <div class="auto-toolbar" style="margin-top:10px">
+      <button class="auto-btn" id="saveMissionBtn" type="button">Save Mission</button>
+      <button class="auto-btn" id="loadMissionBtn" type="button">Load Mission</button>
+      <button class="auto-btn" id="exportMissionBtn" type="button">Export JSON</button>
+      <button class="auto-btn" id="importMissionBtn" type="button">Import JSON</button>
+      <input id="missionFileInput" type="file" accept=".json,application/json" style="display:none">
+    </div>
+
+    <div class="auto-toolbar">
+      <button class="auto-btn good" id="sendMissionBtn2" type="button">Send Mission</button>
+      <button class="auto-btn primary" id="startAutoBtn2" type="button">Start Auto</button>
+      <button class="auto-btn" id="pauseAutoBtn2" type="button">Pause</button>
+      <button class="auto-btn bad" id="stopAutoBtn2" type="button">STOP AUTO</button>
+    </div>
+
+    <div id="missionStatus">Mission idle. Connect the RC-01 before sending or starting an autonomous mission.</div>
+  </div>
+
+  <div class="console">
+    <div class="gauge-wrap">
+      <svg class="gauge-svg" viewBox="0 0 280 280" id="gaugeSvg"></svg>
+      <div class="stick-rig">
+        <div class="throttle-bar" id="throttleBar">
+          <div class="throttle-mid"></div>
+          <div class="throttle-fill" id="throttleFill"></div>
+        </div>
+        <div class="pad" id="pad">
+          <div class="knob" id="knob"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="telemetry">
+      <div class="telem-cell">
+        <div class="telem-label">Angle</div>
+        <div class="telem-value accent" id="angleReadout">0.0°</div>
+      </div>
+      <div class="telem-cell">
+        <div class="telem-label">Throttle</div>
+        <div class="telem-value" id="throttleReadout">0%</div>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <div class="control-head">
+        <span class="control-title">Steering Trim</span>
+        <span class="control-value" id="trimValue">25%</span>
+      </div>
+      <input type="range" id="sensitivity" min="5" max="100" value="25" step="1">
+      <div class="control-sub">Scales how far the stick's left/right throw turns into real steering angle — pull this down for very small, precise curves; push it up for sharper turns.</div>
+    </div>
+
+    <div class="latch-row">
+      <div class="latch-text">
+        <span class="latch-title">Latch Mode</span>
+        <span class="latch-sub">Tap once to go non-stop, tap again to stop — instead of holding</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="latchToggle">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+      </label>
+    </div>
+
+    <div class="dir-row">
+      <button class="dir-btn back" id="backBtn">▼ Reverse</button>
+      <button class="dir-btn fwd" id="fwdBtn">▲ Forward</button>
+    </div>
+    <div class="key-hint">Keyboard: <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> or <kbd>WASD</kbd> to drive, <kbd>Space</kbd> to stop</div>
+
+    <button class="stop-btn" id="stopBtn">Stop</button>
+  </div>
+
+  <div class="panels">
+    <details>
+      <summary>Command Log <span class="chev">▸</span></summary>
+      <div class="log-box" id="logBox"></div>
+    </details>
+
+    <details>
+      <summary>Link Config <span class="chev">▸</span></summary>
+      <div style="padding-top:4px;">
+        <div class="field">
+          <label>Device Name Filter (optional)</label>
+          <input type="text" id="nameFilter" placeholder="e.g. RC-01 — leave blank to filter by service">
+        </div>
+        <div class="field-note">If set, only devices advertising this name prefix appear in the pairing list. Leave blank to filter by Service UUID instead (recommended).</div>
+
+        <label style="display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--text-dim); margin-bottom:14px; cursor:pointer;">
+          <input type="checkbox" id="filterByService" style="width:16px; height:16px; accent-color:var(--accent); margin:0;">
+          Filter by Service UUID (narrower list)
+        </label>
+        <div class="field-note">Off by default so the pairing list shows every nearby BLE device — some may appear as "Unknown or Unsupported Devices," pick yours by elimination. Turn this on once you've confirmed the car connects, to hide unrelated devices.</div>
+        <div class="field-note" style="margin-top:-2px;">Can't tell which one is your car? Open the Arduino Serial Monitor after uploading — it prints the exact MAC address to match against the "(xx:xx:xx…)" shown in each list entry. Seeing "Unknown or Unsupported Device" itself is normal for a custom board like this; it just means Android doesn't recognize the profile type.</div>
+
+        <div class="field">
+          <label>Service UUID</label>
+          <input type="text" id="serviceUUID" value="6e400001-b5a3-f393-e0a9-e50e24dcca9e">
+        </div>
+        <div class="field">
+          <label>Write Characteristic UUID</label>
+          <input type="text" id="writeUUID" value="6e400002-b5a3-f393-e0a9-e50e24dcca9e">
+        </div>
+        <div class="field">
+          <label>Notify Characteristic UUID (optional)</label>
+          <input type="text" id="notifyUUID" value="6e400003-b5a3-f393-e0a9-e50e24dcca9e">
+        </div>
+        <div class="field-note">Defaults match the Nordic UART Service UUIDs used in the companion ESP32 sketch — only change these if you've customized the firmware.</div>
+      </div>
+    </details>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Environment check (runs immediately, before anything else) ----------
+  (function checkEnvironment(){
+    const banner=document.getElementById('contextWarning');
+    const isSecure = window.isSecureContext;
+    const hasBluetooth = !!navigator.bluetooth;
+
+    if(!isSecure){
+      banner.innerHTML = '<strong>This page needs to be served over HTTPS to use Bluetooth.</strong> '
+        + 'It looks like it\'s open from a local file (<code>file://…</code>), which Chrome blocks Web Bluetooth on for security reasons — '
+        + 'this is true even though everything else on the page works fine. Host this file on any HTTPS server (e.g. GitHub Pages, Netlify) '
+        + 'and open it from that address instead.';
+      banner.classList.add('show');
+    }else if(!hasBluetooth){
+      banner.innerHTML = '<strong>Web Bluetooth isn\'t available in this browser.</strong> '
+        + 'Open this page in <strong>Chrome for Android</strong> — it isn\'t supported in Safari, Firefox, or iOS Chrome.';
+      banner.classList.add('show');
+    }
+  })();
+
+  // ---------- State ----------
+  let device=null, gattServer=null, writeChar=null, notifyChar=null;
+  let isDragging=false;
+  let currentAngle=0, currentThrottle=0;
+  let lastSendAt=0;
+  const SEND_INTERVAL_MS=60;
+  const MAX_ANGLE=90; // full-sensitivity steering range, in degrees
+
+  // ---------- Elements ----------
+  const $=id=>document.getElementById(id);
+  const statusDot=$('statusDot'), statusText=$('statusText'), connectBtn=$('connectBtn');
+  const pad=$('pad'), knob=$('knob');
+  const throttleFill=$('throttleFill'), throttleBar=$('throttleBar');
+  const angleReadout=$('angleReadout'), throttleReadout=$('throttleReadout');
+  const sensitivitySlider=$('sensitivity'), trimValue=$('trimValue');
+  const stopBtn=$('stopBtn');
+  const fwdBtn=$('fwdBtn'), backBtn=$('backBtn');
+  const latchToggleInput=$('latchToggle');
+  const logBox=$('logBox');
+  const nameFilterInput=$('nameFilter'), serviceUUIDInput=$('serviceUUID'),
+        writeUUIDInput=$('writeUUID'), notifyUUIDInput=$('notifyUUID'),
+        filterByServiceInput=$('filterByService');
+
+  // ---------- Persisted config ----------
+  try{
+    const saved=JSON.parse(localStorage.getItem('rcConsoleConfig')||'{}');
+    if(saved.nameFilter!==undefined) nameFilterInput.value=saved.nameFilter;
+    if(saved.serviceUUID) serviceUUIDInput.value=saved.serviceUUID;
+    if(saved.writeUUID) writeUUIDInput.value=saved.writeUUID;
+    if(saved.notifyUUID) notifyUUIDInput.value=saved.notifyUUID;
+    if(saved.sensitivity){ sensitivitySlider.value=saved.sensitivity; }
+    if(saved.filterByService){ filterByServiceInput.checked=true; }
+  }catch(e){ /* localStorage unavailable — continue with defaults */ }
+
+  function saveConfig(){
+    try{
+      localStorage.setItem('rcConsoleConfig', JSON.stringify({
+        nameFilter:nameFilterInput.value.trim(),
+        serviceUUID:serviceUUIDInput.value.trim(),
+        writeUUID:writeUUIDInput.value.trim(),
+        notifyUUID:notifyUUIDInput.value.trim(),
+        sensitivity:sensitivitySlider.value,
+        filterByService:filterByServiceInput.checked
+      }));
+    }catch(e){}
+  }
+  [nameFilterInput,serviceUUIDInput,writeUUIDInput,notifyUUIDInput].forEach(el=>{
+    el.addEventListener('change', saveConfig);
+  });
+  filterByServiceInput.addEventListener('change', saveConfig);
+
+  // ---------- Log ----------
+  function log(msg, type){
+    const line=document.createElement('div');
+    line.className='line'+(type?(' '+type):'');
+    const t=new Date();
+    const stamp=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+':'+String(t.getSeconds()).padStart(2,'0');
+    line.textContent='['+stamp+'] '+msg;
+    logBox.appendChild(line);
+    while(logBox.children.length>60){ logBox.removeChild(logBox.firstChild); }
+    logBox.scrollTop=logBox.scrollHeight;
+  }
+
+  // ---------- Gauge (static ticks + dynamic needle) ----------
+  const svg=$('gaugeSvg');
+  const CX=140, CY=176, R_TICK_OUT=138, R_TICK_IN_MINOR=124, R_TICK_IN_MAJOR=116, R_NEEDLE=110;
+  const svgNS='http://www.w3.org/2000/svg';
+
+  function polar(cx,cy,r,angleDeg){
+    const rad=angleDeg*Math.PI/180;
+    return { x:cx + r*Math.sin(rad), y:cy - r*Math.cos(rad) };
+  }
+
+  function buildTicks(){
+    for(let a=-90; a<=90; a+=5){
+      const major = (a%30===0);
+      const p1=polar(CX,CY,R_TICK_OUT,a);
+      const p2=polar(CX,CY, major?R_TICK_IN_MAJOR:R_TICK_IN_MINOR, a);
+      const line=document.createElementNS(svgNS,'line');
+      line.setAttribute('x1',p1.x); line.setAttribute('y1',p1.y);
+      line.setAttribute('x2',p2.x); line.setAttribute('y2',p2.y);
+      line.setAttribute('class','tick'+(major?' major':''));
+      svg.appendChild(line);
+    }
+    [[-90,'-90°','end'],[0,'0°','middle'],[90,'90°','start']].forEach(([a,label,anchor])=>{
+      const p=polar(CX,CY,R_TICK_OUT+14,a);
+      const t=document.createElementNS(svgNS,'text');
+      t.setAttribute('x',p.x); t.setAttribute('y',p.y+4);
+      t.setAttribute('text-anchor',anchor);
+      t.setAttribute('class','gauge-label');
+      t.textContent=label;
+      svg.appendChild(t);
+    });
+  }
+  buildTicks();
+
+  const needle=document.createElementNS(svgNS,'line');
+  needle.setAttribute('class','needle');
+  needle.setAttribute('x1',CX); needle.setAttribute('y1',CY);
+  svg.appendChild(needle);
+  const hub=document.createElementNS(svgNS,'circle');
+  hub.setAttribute('class','needle-hub');
+  hub.setAttribute('cx',CX); hub.setAttribute('cy',CY); hub.setAttribute('r',5);
+  svg.appendChild(hub);
+
+  function updateNeedle(angleDeg){
+    const p=polar(CX,CY,R_NEEDLE,angleDeg);
+    needle.setAttribute('x2',p.x);
+    needle.setAttribute('y2',p.y);
+  }
+  updateNeedle(0);
+
+  // ---------- Sensitivity ----------
+  function refreshSensitivityLabel(){
+    trimValue.textContent=sensitivitySlider.value+'%';
+  }
+  sensitivitySlider.addEventListener('input', ()=>{
+    refreshSensitivityLabel();
+    saveConfig();
+  });
+  refreshSensitivityLabel();
+
+  // ---------- Joystick ----------
+  const PAD_RADIUS=170/2; // matches CSS .pad size
+  let padRect=null;
+
+  function getPadCenter(){
+    padRect=pad.getBoundingClientRect();
+    return { x:padRect.left+padRect.width/2, y:padRect.top+padRect.height/2, r:padRect.width/2 };
+  }
+
+  function setKnob(dx,dy){
+    knob.style.left=(PAD_RADIUS+dx)+'px';
+    knob.style.top=(PAD_RADIUS+dy)+'px';
+  }
+
+  function updateFromVector(dx,dy,radius){
+    const dist=Math.min(Math.sqrt(dx*dx+dy*dy),radius);
+    const clampScale = dist>0 ? Math.min(1,radius/Math.sqrt(dx*dx+dy*dy)) : 1;
+    const cdx = dx*clampScale, cdy = dy*clampScale;
+
+    setKnob(cdx,cdy);
+
+    const sensitivity=parseFloat(sensitivitySlider.value)/100;
+    const steerRaw=cdx/radius; // -1..1
+    currentAngle = steerRaw * MAX_ANGLE * sensitivity;
+
+    const throttleRaw = -cdy/radius; // -1..1, up = positive
+    currentThrottle = throttleRaw * 100;
+
+    updateNeedle(currentAngle);
+    updateThrottleBar(currentThrottle);
+    updateReadouts();
+    maybeSend(false);
+  }
+
+  function updateThrottleBar(val){
+    const pct=Math.abs(val)/100; // 0..1
+    const maxHalf=throttleBar.clientHeight/2;
+    const h=pct*maxHalf;
+    throttleFill.style.height=h+'px';
+    if(val>=0){
+      throttleFill.classList.remove('reverse');
+      throttleFill.style.top=(maxHalf - h)+'px';
+    }else{
+      throttleFill.classList.add('reverse');
+      throttleFill.style.top='50%';
+    }
+  }
+
+  function updateReadouts(){
+    const sign=currentAngle>0?'+':(currentAngle<0?'':'');
+    angleReadout.textContent=sign+currentAngle.toFixed(1)+'°';
+    const tSign=currentThrottle>=0?'':'-';
+    throttleReadout.textContent=tSign+Math.round(Math.abs(currentThrottle))+'%';
+  }
+
+  function resetStick(){
+    knob.classList.remove('dragging');
+    setKnob(0,0);
+    currentAngle=0; currentThrottle=0;
+    updateNeedle(0);
+    updateThrottleBar(0);
+    updateReadouts();
+    maybeSend(true);
+  }
+
+  function onPointerDown(e){
+    isDragging=true;
+    knob.classList.add('dragging');
+    getPadCenter();
+    pad.setPointerCapture(e.pointerId);
+    onPointerMove(e);
+  }
+  function onPointerMove(e){
+    if(!isDragging || !padRect) return;
+    const cx=padRect.left+padRect.width/2, cy=padRect.top+padRect.height/2;
+    const dx=e.clientX-cx, dy=e.clientY-cy;
+    updateFromVector(dx,dy,padRect.width/2);
+  }
+  function onPointerUp(e){
+    if(!isDragging) return;
+    isDragging=false;
+    try{ pad.releasePointerCapture(e.pointerId); }catch(err){}
+    resetStick();
+  }
+
+  pad.addEventListener('pointerdown', onPointerDown);
+  pad.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
+
+  stopBtn.addEventListener('click', ()=>{
+    resetStick();
+    stopDirHold(fwdBtn);
+    stopDirHold(backBtn);
+    latchedSign=0;
+    log('STOP pressed','sys');
+    vibrate(40);
+  });
+
+  // ---------- Haptic feedback ----------
+  function vibrate(ms){
+    if(navigator.vibrate){ try{ navigator.vibrate(ms); }catch(e){} }
+  }
+
+  // ---------- Forward / Reverse buttons ----------
+  // Independent of the joystick — only ever touches throttle, never angle.
+  // Lets you drive straight (whatever the current steering angle is, or
+  // 0 if the joystick is centered) without needing to hold the stick.
+  // Latch Mode (toggle above) switches these from press-and-hold to
+  // tap-once-to-go / tap-again-to-stop.
+  const BUTTON_THROTTLE=70; // fixed speed used while a direction button is held
+  const BUTTON_RESEND_MS=150; // keeps sending while held so the car's link-timeout failsafe doesn't kick in
+  let dirHoldTimer=null;
+  let latchMode=false;
+  let latchedSign=0; // 0 = none, 1 = forward, -1 = reverse
+
+  function dirButtonFor(sign){ return sign===1 ? fwdBtn : backBtn; }
+
+  function startDirHold(sign, btnEl, isLatched){
+    btnEl.classList.add('active');
+    if(isLatched) btnEl.classList.add('latched');
+    currentThrottle=sign*BUTTON_THROTTLE;
+    updateThrottleBar(currentThrottle);
+    updateReadouts();
+    maybeSend(true);
+    clearInterval(dirHoldTimer);
+    dirHoldTimer=setInterval(()=>{ maybeSend(true); }, BUTTON_RESEND_MS);
+    vibrate(15);
+  }
+
+  function stopDirHold(btnEl){
+    if(!btnEl.classList.contains('active')) return;
+    btnEl.classList.remove('active','latched');
+    clearInterval(dirHoldTimer);
+    dirHoldTimer=null;
+    currentThrottle=0;
+    updateThrottleBar(0);
+    updateReadouts();
+    maybeSend(true);
+  }
+
+  function handleDirPress(sign){
+    if(latchMode){
+      if(latchedSign===sign){
+        stopDirHold(dirButtonFor(sign));
+        latchedSign=0;
+      }else{
+        if(latchedSign!==0){ stopDirHold(dirButtonFor(latchedSign)); }
+        startDirHold(sign, dirButtonFor(sign), true);
+        latchedSign=sign;
+      }
+    }else{
+      startDirHold(sign, dirButtonFor(sign), false);
+    }
+  }
+  function handleDirRelease(sign){
+    if(latchMode) return; // in latch mode, releasing early doesn't stop it
+    stopDirHold(dirButtonFor(sign));
+  }
+
+  function wireDirButton(btnEl, sign){
+    btnEl.addEventListener('pointerdown', e=>{ e.preventDefault(); handleDirPress(sign); });
+    btnEl.addEventListener('pointerup', ()=>handleDirRelease(sign));
+    btnEl.addEventListener('pointercancel', ()=>handleDirRelease(sign));
+    btnEl.addEventListener('pointerleave', ()=>handleDirRelease(sign));
+  }
+  wireDirButton(fwdBtn, 1);
+  wireDirButton(backBtn, -1);
+
+  latchToggleInput.addEventListener('change', ()=>{
+    latchMode=latchToggleInput.checked;
+    if(!latchMode && latchedSign!==0){
+      stopDirHold(dirButtonFor(latchedSign));
+      latchedSign=0;
+    }
+    vibrate(10);
+    log('Latch mode '+(latchMode?'ON — tap to go, tap again to stop':'OFF — press and hold'),'sys');
+  });
+
+  // ---------- Keyboard controls ----------
+  // Extra input method alongside touch: arrow keys / WASD drive the car,
+  // Space stops it. Ignored while typing into the Link Config fields.
+  function keySteer(sign){
+    const sensitivity=parseFloat(sensitivitySlider.value)/100;
+    currentAngle=sign*MAX_ANGLE*sensitivity;
+    updateNeedle(currentAngle);
+    updateReadouts();
+    maybeSend(true);
+  }
+  function keySteerRelease(){
+    currentAngle=0;
+    updateNeedle(0);
+    updateReadouts();
+    maybeSend(true);
+  }
+  function isTypingTarget(el){
+    const tag=(el && el.tagName) || '';
+    return tag==='INPUT' || tag==='TEXTAREA';
+  }
+
+  window.addEventListener('keydown', e=>{
+    if(e.repeat || isTypingTarget(e.target)) return;
+    switch(e.key){
+      case 'ArrowUp': case 'w': case 'W':
+        e.preventDefault(); handleDirPress(1); break;
+      case 'ArrowDown': case 's': case 'S':
+        e.preventDefault(); handleDirPress(-1); break;
+      case 'ArrowLeft': case 'a': case 'A':
+        e.preventDefault(); keySteer(-1); break;
+      case 'ArrowRight': case 'd': case 'D':
+        e.preventDefault(); keySteer(1); break;
+      case ' ':
+        e.preventDefault();
+        resetStick(); stopDirHold(fwdBtn); stopDirHold(backBtn); latchedSign=0;
+        log('STOP (keyboard)','sys'); vibrate(40);
+        break;
+    }
+  });
+  window.addEventListener('keyup', e=>{
+    if(isTypingTarget(e.target)) return;
+    switch(e.key){
+      case 'ArrowUp': case 'w': case 'W':
+        handleDirRelease(1); break;
+      case 'ArrowDown': case 's': case 'S':
+        handleDirRelease(-1); break;
+      case 'ArrowLeft': case 'a': case 'A':
+      case 'ArrowRight': case 'd': case 'D':
+        keySteerRelease(); break;
+    }
+  });
+
+
+  // ---------- Autonomous Map Mode ----------
+  // This section is additive: the original manual console remains unchanged.
+  let autoMap=null, autoAddMode=false, autoFollow=false;
+  let autoUserMarker=null, autoAccuracyCircle=null, autoCarMarker=null, autoHomeMarker=null;
+  let autoRouteLine=null, autoWaypointLayer=null;
+  let autoWaypoints=[], autoHome=null;
+  let autoStreetLayer=null, autoSatelliteLayer=null;
+
+  const autoPanel=$('autoPanel');
+  const mapModeBtn=$('mapModeBtn');
+  const closeAutoBtn=$('closeAutoBtn');
+
+  function autoStatus(msg){
+    $('missionStatus').textContent=msg;
+  }
+
+  function initAutoMap(){
+    if(autoMap) return;
+
+    autoMap=L.map('autoMap',{zoomControl:true}).setView([20.5937,78.9629],5);
+
+    autoStreetLayer=L.tileLayer(
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {maxZoom:19,attribution:'© OpenStreetMap contributors'}
+    ).addTo(autoMap);
+
+    // Esri World Imagery: satellite imagery, no API key required for this
+    // public tile endpoint. Usage is subject to Esri terms.
+    autoSatelliteLayer=L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {maxZoom:19,attribution:'Tiles © Esri'}
+    );
+
+    autoWaypointLayer=L.layerGroup().addTo(autoMap);
+
+    L.control.layers({
+      'Street':autoStreetLayer,
+      'Satellite':autoSatelliteLayer
+    },{},{
+      collapsed:true,
+      position:'topright'
+    }).addTo(autoMap);
+
+    autoMap.on('click',function(e){
+      if(!autoAddMode) return;
+      addAutoWaypoint(e.latlng.lat,e.latlng.lng);
+    });
+
+    setTimeout(()=>autoMap.invalidateSize(),100);
+  }
+
+  function openAutoMap(){
+    autoPanel.classList.add('open');
+    document.querySelector('.console').style.display='none';
+    document.querySelector('.panels').style.display='none';
+    document.querySelector('.support-note').style.display='none';
+    initAutoMap();
+    setTimeout(()=>autoMap.invalidateSize(),120);
+  }
+
+  function closeAutoMap(){
+    autoPanel.classList.remove('open');
+    document.querySelector('.console').style.display='';
+    document.querySelector('.panels').style.display='';
+    document.querySelector('.support-note').style.display='';
+  }
+
+  mapModeBtn.addEventListener('click',openAutoMap);
+  closeAutoBtn.addEventListener('click',closeAutoMap);
+
+  function addAutoWaypoint(lat,lng){
+    const maxSpeed=parseFloat($('autoMaxSpeed').value)||60;
+    const speed=Math.min(parseFloat($('autoDefaultSpeed').value)||30,maxSpeed);
+    const radius=parseFloat($('autoDefaultRadius').value)||4;
+
+    autoWaypoints.push({
+      lat:lat,lng:lng,speed:speed,stop:0,radius:radius
+    });
+
+    renderAutoMission();
+    autoStatus('Waypoint '+autoWaypoints.length+' added. Continue tapping to add more points.');
+  }
+
+  $('addWaypointBtn').addEventListener('click',function(){
+    autoAddMode=!autoAddMode;
+    this.classList.toggle('active',autoAddMode);
+    this.textContent=autoAddMode?'✓ Tap Map to Add':'＋ Add Points';
+    autoStatus(autoAddMode?
+      'ADD POINT MODE: tap the map repeatedly to create multiple waypoints.':
+      'Add point mode OFF.'
+    );
+  });
+
+  $('undoWaypointBtn').addEventListener('click',function(){
+    if(!autoWaypoints.length)return;
+    autoWaypoints.pop();
+    renderAutoMission();
+    autoStatus('Last waypoint removed.');
+  });
+
+  $('clearMissionBtn').addEventListener('click',function(){
+    autoWaypoints=[];
+    renderAutoMission();
+    autoStatus('All waypoints cleared.');
+  });
+
+  function drawAutoRoute(){
+    if(!autoMap)return;
+    if(autoWaypointLayer)autoWaypointLayer.clearLayers();
+
+    if(autoRouteLine){
+      autoMap.removeLayer(autoRouteLine);
+      autoRouteLine=null;
+    }
+
+    const coords=[];
+
+    autoWaypoints.forEach(function(w,i){
+      const marker=L.marker([w.lat,w.lng],{
+        draggable:true,
+        title:'Waypoint '+(i+1)
+      }).addTo(autoWaypointLayer);
+
+      marker.bindTooltip(String(i+1),{
+        permanent:true,
+        direction:'center',
+        className:'rc-wp-label',
+        opacity:.9
+      });
+
+      marker.bindPopup(
+        '<b>Waypoint '+(i+1)+'</b><br>'+
+        w.lat.toFixed(6)+', '+w.lng.toFixed(6)+'<br>'+
+        'Speed: '+w.speed+'%<br>'+
+        'Stop: '+w.stop+' s<br>'+
+        'Arrival radius: '+w.radius+' m'
+      );
+
+      marker.on('dragend',function(ev){
+        const pos=ev.target.getLatLng();
+        autoWaypoints[i].lat=pos.lat;
+        autoWaypoints[i].lng=pos.lng;
+        renderAutoMission();
+        autoStatus('Waypoint '+(i+1)+' moved.');
+      });
+
+      coords.push([w.lat,w.lng]);
+    });
+
+    if(autoHome){
+      if(autoHomeMarker)autoMap.removeLayer(autoHomeMarker);
+      autoHomeMarker=L.marker([autoHome.lat,autoHome.lng],{
+        title:'HOME'
+      }).addTo(autoMap).bindPopup('HOME');
+    }
+
+    if(coords.length>=2){
+      autoRouteLine=L.polyline(coords,{weight:4,opacity:.85}).addTo(autoMap);
+    }
+  }
+
+  function renderAutoMission(){
+    drawAutoRoute();
+    renderWaypointList();
+    updateAutoStats();
+  }
+
+  function renderWaypointList(){
+    const box=$('waypointList');
+
+    if(!autoWaypoints.length){
+      box.innerHTML='<div style="font-size:10.5px;color:var(--text-dim)">No points yet. Tap “Add Points”, then tap the map.</div>';
+      return;
+    }
+
+    box.innerHTML='';
+
+    autoWaypoints.forEach(function(w,i){
+      const row=document.createElement('div');
+      row.className='wp-item';
+
+      row.innerHTML=
+        '<div class="wp-top">'+
+          '<span class="wp-name">WP '+(i+1)+'</span>'+
+          '<button class="wp-delete" data-wp-remove="'+i+'">×</button>'+
+        '</div>'+
+        '<div class="wp-coord">'+w.lat.toFixed(6)+', '+w.lng.toFixed(6)+'</div>'+
+        '<div class="wp-fields">'+
+          '<label>Speed %<input data-wp-i="'+i+'" data-wp-k="speed" type="number" min="5" max="100" value="'+w.speed+'"></label>'+
+          '<label>Stop sec<input data-wp-i="'+i+'" data-wp-k="stop" type="number" min="0" max="3600" value="'+w.stop+'"></label>'+
+          '<label>Radius m<input data-wp-i="'+i+'" data-wp-k="radius" type="number" min="1" max="30" value="'+w.radius+'"></label>'+
+        '</div>';
+
+      box.appendChild(row);
+    });
+
+    box.querySelectorAll('input[data-wp-i]').forEach(function(input){
+      input.addEventListener('change',function(){
+        const i=parseInt(this.dataset.wpI,10);
+        const k=this.dataset.wpK;
+        let v=parseFloat(this.value);
+
+        if(!isFinite(v))v=0;
+        if(k==='speed')v=Math.max(5,Math.min(100,v));
+        if(k==='stop')v=Math.max(0,Math.min(3600,v));
+        if(k==='radius')v=Math.max(1,Math.min(30,v));
+
+        autoWaypoints[i][k]=v;
+        this.value=v;
+        renderAutoMission();
+      });
+    });
+
+    box.querySelectorAll('[data-wp-remove]').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        autoWaypoints.splice(parseInt(this.dataset.wpRemove,10),1);
+        renderAutoMission();
+      });
+    });
+  }
+
+  function autoDistance(a,b){
+    const R=6371000;
+    const p1=a.lat*Math.PI/180,p2=b.lat*Math.PI/180;
+    const dp=(b.lat-a.lat)*Math.PI/180,dl=(b.lng-a.lng)*Math.PI/180;
+    const x=Math.sin(dp/2)**2+
+      Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+    return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+  }
+
+  function updateAutoStats(){
+    let distance=0,seconds=0;
+
+    for(let i=1;i<autoWaypoints.length;i++){
+      const d=autoDistance(autoWaypoints[i-1],autoWaypoints[i]);
+      distance+=d;
+
+      const speed=Math.max(0.2,(autoWaypoints[i].speed/100)*5);
+      seconds+=(d/1000)/speed*3600;
+    }
+
+    autoWaypoints.forEach(w=>seconds+=Number(w.stop)||0);
+
+    $('autoWpCount').textContent=autoWaypoints.length;
+    $('autoDistance').textContent=
+      distance<1000?Math.round(distance)+' m':(distance/1000).toFixed(2)+' km';
+    $('autoEta').textContent=
+      seconds<60?Math.round(seconds)+' s':
+      Math.floor(seconds/60)+'m '+Math.round(seconds%60)+'s';
+  }
+
+  function locatePhone(){
+    if(!navigator.geolocation){
+      autoStatus('GPS/location is not supported by this browser.');
+      return;
+    }
+
+    autoStatus('Getting high-accuracy current location…');
+
+    navigator.geolocation.getCurrentPosition(function(pos){
+      const lat=pos.coords.latitude,lng=pos.coords.longitude;
+      const accuracy=pos.coords.accuracy||0;
+
+      if(autoUserMarker)autoMap.removeLayer(autoUserMarker);
+      if(autoAccuracyCircle)autoMap.removeLayer(autoAccuracyCircle);
+
+      autoUserMarker=L.circleMarker([lat,lng],{
+        radius:7,color:'#35D07F',fillColor:'#35D07F',fillOpacity:1
+      }).addTo(autoMap).bindPopup('CURRENT PHONE LOCATION');
+
+      autoAccuracyCircle=L.circle([lat,lng],{
+        radius:accuracy,color:'#35D07F',weight:1,fillOpacity:.06
+      }).addTo(autoMap);
+
+      autoMap.setView([lat,lng],18);
+      $('autoGpsStatus').textContent=Math.round(accuracy)+'m';
+
+      autoStatus(
+        'Current location found.\\n'+
+        'LAT: '+lat.toFixed(6)+'\\n'+
+        'LNG: '+lng.toFixed(6)+'\\n'+
+        'Accuracy: '+accuracy.toFixed(1)+' m'
+      );
+    },function(err){
+      autoStatus('Location error: '+err.message);
+    },{
+      enableHighAccuracy:true,
+      timeout:15000,
+      maximumAge:1000
+    });
+  }
+
+  $('currentLocationBtn').addEventListener('click',locatePhone);
+
+  $('followLocationBtn').addEventListener('click',function(){
+    autoFollow=!autoFollow;
+    this.textContent='Follow: '+(autoFollow?'ON':'OFF');
+    this.classList.toggle('active',autoFollow);
+  });
+
+  $('setHomeBtn').addEventListener('click',function(){
+    if(!navigator.geolocation){
+      autoStatus('Phone GPS is unavailable.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(function(pos){
+      autoHome={lat:pos.coords.latitude,lng:pos.coords.longitude};
+      if(autoHomeMarker)autoMap.removeLayer(autoHomeMarker);
+      autoHomeMarker=L.marker([autoHome.lat,autoHome.lng],{
+        title:'HOME'
+      }).addTo(autoMap).bindPopup('HOME').openPopup();
+      autoStatus('Home point set from current phone location.');
+    },function(err){
+      autoStatus('Cannot set Home: '+err.message);
+    },{
+      enableHighAccuracy:true,timeout:15000,maximumAge:1000
+    });
+  });
+
+  // Browser location tracking while map is open.
+  let autoWatchId=null;
+
+  function startLocationWatch(){
+    if(autoWatchId!==null||!navigator.geolocation)return;
+
+    autoWatchId=navigator.geolocation.watchPosition(function(pos){
+      const lat=pos.coords.latitude,lng=pos.coords.longitude;
+      if(!autoMap) return;
+      const accuracy=pos.coords.accuracy||0;
+
+      $('autoGpsStatus').textContent=Math.round(accuracy)+'m';
+
+      if(!autoUserMarker){
+        autoUserMarker=L.circleMarker([lat,lng],{
+          radius:7,color:'#35D07F',fillColor:'#35D07F',fillOpacity:1
+        }).addTo(autoMap);
+      }else autoUserMarker.setLatLng([lat,lng]);
+
+      if(!autoAccuracyCircle){
+        autoAccuracyCircle=L.circle([lat,lng],{
+          radius:accuracy,color:'#35D07F',weight:1,fillOpacity:.06
+        }).addTo(autoMap);
+      }else{
+        autoAccuracyCircle.setLatLng([lat,lng]);
+        autoAccuracyCircle.setRadius(accuracy);
+      }
+
+      if(autoFollow)autoMap.setView([lat,lng],autoMap.getZoom());
+    },function(err){
+      $('autoGpsStatus').textContent='ERR';
+    },{
+      enableHighAccuracy:true,maximumAge:1000,timeout:10000
+    });
+  }
+
+  startLocationWatch();
+
+  // ---------- Mission save / load / JSON ----------
+  function missionObject(){
+    return {
+      version:1,
+      created:new Date().toISOString(),
+      home:autoHome,
+      defaults:{
+        speed:Number($('autoDefaultSpeed').value),
+        radius:Number($('autoDefaultRadius').value),
+        slowDistance:Number($('autoSlowDistance').value),
+        gpsInterval:Number($('autoGpsInterval').value),
+        maxSpeed:Number($('autoMaxSpeed').value),
+        lookAhead:Number($('autoLookAhead').value),
+        geofence:$('autoGeofence').checked,
+        obstacle:$('autoObstacle').checked,
+        returnHome:$('autoReturnHome').checked
+      },
+      waypoints:autoWaypoints
+    };
+  }
+
+  function applyMission(obj){
+    if(!obj||!Array.isArray(obj.waypoints))throw new Error('Invalid mission JSON.');
+
+    autoWaypoints=obj.waypoints.map(w=>({
+      lat:Number(w.lat),lng:Number(w.lng),
+      speed:Number(w.speed),stop:Number(w.stop),radius:Number(w.radius)
+    })).filter(w=>isFinite(w.lat)&&isFinite(w.lng));
+
+    if(obj.home)autoHome={lat:Number(obj.home.lat),lng:Number(obj.home.lng)};
+
+    const d=obj.defaults||{};
+    if(d.speed!=null)$('autoDefaultSpeed').value=d.speed;
+    if(d.radius!=null)$('autoDefaultRadius').value=d.radius;
+    if(d.slowDistance!=null)$('autoSlowDistance').value=d.slowDistance;
+    if(d.gpsInterval!=null)$('autoGpsInterval').value=d.gpsInterval;
+    if(d.maxSpeed!=null)$('autoMaxSpeed').value=d.maxSpeed;
+    if(d.lookAhead!=null)$('autoLookAhead').value=d.lookAhead;
+    if(d.geofence!=null)$('autoGeofence').checked=!!d.geofence;
+    if(d.obstacle!=null)$('autoObstacle').checked=!!d.obstacle;
+    if(d.returnHome!=null)$('autoReturnHome').checked=!!d.returnHome;
+
+    renderAutoMission();
+
+    if(autoWaypoints.length){
+      autoMap.fitBounds(autoWaypoints.map(w=>[w.lat,w.lng]),{padding:[25,25]});
+    }
+
+    autoStatus('Mission loaded: '+autoWaypoints.length+' waypoint(s).');
+  }
+
+  $('saveMissionBtn').addEventListener('click',function(){
+    try{
+      localStorage.setItem('rc01AutoMission',JSON.stringify(missionObject()));
+      autoStatus('Mission saved on this phone/browser.');
+    }catch(e){autoStatus('Save failed: '+e.message);}
+  });
+
+  $('loadMissionBtn').addEventListener('click',function(){
+    try{
+      const raw=localStorage.getItem('rc01AutoMission');
+      if(!raw)throw new Error('No saved mission found.');
+      applyMission(JSON.parse(raw));
+    }catch(e){autoStatus('Load failed: '+e.message);}
+  });
+
+  $('exportMissionBtn').addEventListener('click',function(){
+    const blob=new Blob([JSON.stringify(missionObject(),null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='RC01_mission.json';a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  });
+
+  $('importMissionBtn').addEventListener('click',()=>$('missionFileInput').click());
+
+  $('missionFileInput').addEventListener('change',function(){
+    const file=this.files[0];
+    if(!file)return;
+
+    const reader=new FileReader();
+
+    reader.onload=function(){
+      try{
+        applyMission(JSON.parse(reader.result));
+      }catch(e){autoStatus('Import failed: '+e.message);}
+    };
+
+    reader.readAsText(file);
+    this.value='';
+  });
+
+  // ---------- BLE mission protocol ----------
+  async function autoSendText(text){
+    if(!writeChar)throw new Error('Connect to RC-01 first.');
+
+    const data=new TextEncoder().encode(text+'\\n');
+
+    if(writeChar.writeValueWithoutResponse){
+      await writeChar.writeValueWithoutResponse(data);
+    }else{
+      await writeChar.writeValue(data);
+    }
+
+    log('AUTO TX '+text,'tx');
+  }
+
+  async function uploadAutoMission(){
+    if(!autoWaypoints.length)throw new Error('Add at least one waypoint.');
+    if(!writeChar)throw new Error('Connect to RC-01 first.');
+
+    await autoSendText('M,CLEAR');
+    await new Promise(r=>setTimeout(r,80));
+    await autoSendText('M,BEGIN,'+autoWaypoints.length);
+    await new Promise(r=>setTimeout(r,80));
+
+    for(let i=0;i<autoWaypoints.length;i++){
+      const w=autoWaypoints[i];
+      const cmd='W,'+i+','+
+        w.lat.toFixed(6)+','+w.lng.toFixed(6)+','+
+        w.speed.toFixed(0)+','+w.stop.toFixed(0)+','+w.radius.toFixed(1);
+
+      await autoSendText(cmd);
+      await new Promise(r=>setTimeout(r,80));
+    }
+
+    const cfg='M,CFG,'+
+      Number($('autoSlowDistance').value||10).toFixed(1)+','+
+      Number($('autoGpsInterval').value||500)+','+
+      ($('autoGeofence').checked?1:0)+','+
+      ($('autoObstacle').checked?1:0)+','+
+      ($('autoReturnHome').checked?1:0);
+
+    await autoSendText(cfg);
+    autoStatus('Mission uploaded successfully: '+autoWaypoints.length+' point(s).');
+  }
+
+  $('sendMissionBtn2').addEventListener('click',async function(){
+    try{await uploadAutoMission();}
+    catch(e){autoStatus('SEND ERROR: '+e.message);log('AUTO SEND ERROR: '+e.message,'err');}
+  });
+
+  $('startAutoBtn2').addEventListener('click',async function(){
+    try{
+      if(!writeChar)throw new Error('Connect to RC-01 first.');
+      if(!autoWaypoints.length)throw new Error('Add at least one waypoint.');
+      await autoSendText('M,START');
+      autoStatus('AUTO RUNNING\\nESP32 is following the waypoint mission.');
+    }catch(e){autoStatus('START ERROR: '+e.message);}
+  });
+
+  $('pauseAutoBtn2').addEventListener('click',async function(){
+    try{
+      await autoSendText('M,PAUSE');
+      autoStatus('AUTO PAUSED');
+    }catch(e){autoStatus('PAUSE ERROR: '+e.message);}
+  });
+
+  $('stopAutoBtn2').addEventListener('click',async function(){
+    try{
+      if(writeChar)await autoSendText('M,STOP');
+      autoStatus('AUTO STOPPED — motor stop command sent.');
+    }catch(e){autoStatus('STOP ERROR: '+e.message);}
+  });
+
+
+  // ---------- BLE ----------
+  function setStatus(state, label){
+    statusDot.className='status-dot '+state;
+    statusText.textContent=label;
+  }
+
+  connectBtn.addEventListener('click', async ()=>{
+    if(gattServer && gattServer.connected){
+      device.gatt.disconnect();
+      return;
+    }
+    if(!navigator.bluetooth){
+      log('Web Bluetooth not available in this browser.','err');
+      alert('Web Bluetooth isn\'t available here. Open this page in Chrome for Android over HTTPS.');
+      return;
+    }
+    const serviceUUID=serviceUUIDInput.value.trim().toLowerCase();
+    const writeUUID=writeUUIDInput.value.trim().toLowerCase();
+    const notifyUUID=notifyUUIDInput.value.trim().toLowerCase();
+    const namePrefix=nameFilterInput.value.trim();
+    const strictServiceFilter=filterByServiceInput.checked;
+
+    try{
+      if(navigator.bluetooth.getAvailability){
+        const available=await navigator.bluetooth.getAvailability();
+        if(!available){
+          setStatus('','Disconnected');
+          log('Bluetooth adapter reports unavailable — turn Bluetooth on and try again.','err');
+          return;
+        }
+      }
+
+      setStatus('connecting','Scanning…');
+      const options={ optionalServices:[serviceUUID] };
+      if(namePrefix){
+        options.filters=[{ namePrefix }];
+      }else if(strictServiceFilter){
+        options.filters=[{ services:[serviceUUID] }];
+      }else{
+        options.acceptAllDevices=true;
+      }
+
+      device=await navigator.bluetooth.requestDevice(options);
+      log('Selected device: '+(device.name||'(unnamed)'),'sys');
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+
+      setStatus('connecting','Connecting…');
+      gattServer=await device.gatt.connect();
+      const service=await gattServer.getPrimaryService(serviceUUID);
+      writeChar=await service.getCharacteristic(writeUUID);
+
+      if(notifyUUID){
+        try{
+          notifyChar=await service.getCharacteristic(notifyUUID);
+          await notifyChar.startNotifications();
+          notifyChar.addEventListener('characteristicvaluechanged', onNotify);
+        }catch(e){
+          log('Notify characteristic unavailable (continuing without it).','err');
+        }
+      }
+
+      setStatus('connected', device.name||'Linked');
+      connectBtn.textContent='Disconnect';
+      connectBtn.classList.add('linked');
+      log('Connected — ready to drive.','sys');
+      vibrate(20);
+      requestWakeLock();
+    }catch(err){
+      setStatus('','Disconnected');
+      connectBtn.textContent='Connect';
+      connectBtn.classList.remove('linked');
+      if(err.name==='NotFoundError'){
+        if(strictServiceFilter){
+          log('No device advertising that Service UUID was found. Uncheck "Filter by Service UUID" to see all nearby devices, or check the firmware is running and matches these UUIDs.','err');
+        }else{
+          log('Pairing cancelled, or nothing was picked from the list.','err');
+        }
+      }else{
+        log('Connection failed: '+err.message,'err');
+      }
+    }
+  });
+
+  // ---------- Screen Wake Lock ----------
+  // Keeps the display on while connected, so it doesn't dim/lock mid-drive.
+  let wakeLock=null;
+  async function requestWakeLock(){
+    try{
+      if('wakeLock' in navigator){
+        wakeLock=await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', ()=>{ wakeLock=null; });
+        log('Screen will stay on while connected.','sys');
+      }
+    }catch(err){ /* not supported or denied — not critical, ignore */ }
+  }
+  function releaseWakeLock(){
+    if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
+  }
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible' && !wakeLock && gattServer && gattServer.connected){
+      requestWakeLock();
+    }
+  });
+
+  function onDisconnected(){
+    setStatus('','Disconnected');
+    connectBtn.textContent='Connect';
+    connectBtn.classList.remove('linked');
+    writeChar=null; notifyChar=null; gattServer=null;
+    log('Disconnected.','err');
+    resetStick();
+    stopDirHold(fwdBtn);
+    stopDirHold(backBtn);
+    latchedSign=0;
+    releaseWakeLock();
+  }
+
+  function onNotify(e){
+    const value=new TextDecoder().decode(e.target.value);
+    log('RX '+value,'sys');
+
+    // Optional autonomous telemetry:
+    // GPS,WP=1,D=12.3,LAT=18.520400,LNG=73.856700
+    if(value.indexOf('GPS,')===0 && autoMap){
+      const m=value.match(/LAT=([-+0-9.]+),LNG=([-+0-9.]+)/);
+      const d=value.match(/D=([-+0-9.]+)/);
+
+      if(m){
+        const lat=parseFloat(m[1]),lng=parseFloat(m[2]);
+
+        if(!autoCarMarker){
+          autoCarMarker=L.circleMarker([lat,lng],{
+            radius:8,color:'#FF6A1A',fillColor:'#FF6A1A',fillOpacity:1
+          }).addTo(autoMap).bindPopup('RC-01');
+        }else{
+          autoCarMarker.setLatLng([lat,lng]);
+        }
+
+        if(autoFollow){
+          autoMap.panTo([lat,lng]);
+        }
+
+        autoStatus(
+          'LIVE CAR GPS\n'+
+          'LAT: '+lat.toFixed(6)+'\n'+
+          'LNG: '+lng.toFixed(6)+
+          (d?'\nDistance to WP: '+d[1]+' m':'')
+        );
+      }
+    }
+  }
+
+  const encoder=new TextEncoder();
+  async function maybeSend(force){
+    if(!writeChar) return;
+    const now=performance.now();
+    if(!force && (now-lastSendAt)<SEND_INTERVAL_MS) return;
+    lastSendAt=now;
+    const payload='A:'+currentAngle.toFixed(1)+',S:'+currentThrottle.toFixed(0)+'\n';
+    try{
+      if(writeChar.writeValueWithoutResponse){
+        await writeChar.writeValueWithoutResponse(encoder.encode(payload));
+      }else{
+        await writeChar.writeValue(encoder.encode(payload));
+      }
+      log('TX '+payload.trim(),'tx');
+    }catch(err){
+      log('Write failed: '+err.message,'err');
+    }
+  }
+
+  // Recalculate pad geometry on resize/orientation change
+  window.addEventListener('resize', ()=>{ if(isDragging) getPadCenter(); });
+
+  log('Console ready. Configure Link Config if your firmware uses custom UUIDs.','sys');
+})();
+</script>
+</body>
+</html>
